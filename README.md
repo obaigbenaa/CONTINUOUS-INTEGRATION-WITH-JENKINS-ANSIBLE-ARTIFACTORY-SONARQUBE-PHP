@@ -344,7 +344,7 @@ Update pipeline syntax in jenkinsfile.
 
 Now scan the repository.
 
-this will perform an ***initial cleanup, checkout SCM, prepare ansible for execution, run ansible playbook and clean workspace after build***.
+This will perform an ***initial cleanup, checkout SCM, prepare ansible for execution, run ansible playbook and clean workspace after build***.
 
 ![scan repo](Images/Images/Scan-repo-main.png)
 
@@ -357,9 +357,12 @@ this will perform an ***initial cleanup, checkout SCM, prepare ansible for execu
 
 
 
+> Our Dev environment now has an up-to-date configuration. But what if we need to deploy to other environments?
+>
+>Manually updating the Jenkinsfile is definitely not an option. The aim is to try to automate things as much as possible.
 
 
-**Parameterizing Jenkinsfile For Ansible Deployment.** 
+### Parameterizing Jenkinsfile For Ansible Deployment. 
 
 So far we have been deploying to dev environment, what if we need to deploy to other environments? We will use parameterization so that at the point of execution, the appropriate values are applied. To parameterize Jenkinsfile For Ansible Deployment, Update CI inventory with new servers.
 
