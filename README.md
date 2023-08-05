@@ -2,24 +2,24 @@
 
 ## CONTINUOUS INTEGRATION WITH JENKINS, ANSIBLE, ARTIFACTORY, SONARQUBE, PHP
 
-## SIMULATING A TYPICAL CI/CD PIPELINE FOR A PHP BASED APPLICATION
+## SIMULATING A TYPICAL CI/CD PIPELINE FOR A PHP-BASED APPLICATION
 
 **Project Description:**
 
-In this project, we will be setting up a CI/CD Pipeline for a PHP based application. The overall CI/CD process looks like the architecture below:
+In this project, we will be setting up a CI/CD Pipeline for a PHP-based application. The overall CI/CD process looks like the architecture below:
 
 ![architecture](Images/Images/architecture.png)
 
 This project is architected in two major repositories with each repository containing its own CI/CD pipeline written in a Jenkinsfile.
 
-**“ansible-config-mgt” REPO**: this repository contains JenkinsFile which is responsible for setting up and configuring infrastructure required to carry out processes required for our application to run. It does this through the use of ansible roles. This repo is infrastructure specific.
+**“ansible-config-mgt” REPO**: this repository contains JenkinsFile which is responsible for setting up and configuring the infrastructure required to carry out processes required for our application to run. It does this through the use of ansible roles. This repo is infrastructure specific.
 
-**“PHP-todo REPO”:** this repository contains jenkinsfile which is focused on processes which are application build specific such as building, linting, static code analysis, push to artifact repository etc.
+**“PHP-todo REPO”:** This repository contains Jenkinsfile which is focused on processes that are application build specific such as building, linting, static code analysis, push to artifact repository, etc.
 
 
 ### Prerequisites
 
-We will be making use of AWS virtual machines for this and will require 6 servers for the project which includes:
+We will be making use of AWS virtual machines for this and will require 6 servers for the project which include:
 
 **Nginx Server:** This would act as the reverse proxy server to our site and tool.
 
@@ -27,9 +27,9 @@ We will be making use of AWS virtual machines for this and will require 6 server
 
 **SonarQube server:** To be used for Code quality analysis. Select a t2.medium at least, Ubuntu 20.04 and Security group should be open to port 9000
 
-**Artifactory server:** To be used as the binary repository where the outcome of your build process is stored. Select a t2.medium at least and Security group should be open to port 8081
+**Artifactory server:** To be used as the binary repository where the outcome of your build process is stored. Select a t2.medium at least and the Security group should be open to port 8081
 
-**Database server:** To server as the databse server for the Todo application
+**Database server:** To serve as the database server for the Todo application
 
 **Todo webserver:** To host the Todo web application.
 
@@ -37,7 +37,7 @@ We will be making use of AWS virtual machines for this and will require 6 server
 
 ### ANSIBLE ROLES FOR CI ENVIRONMENT
 
-In addition to our already existing roles, we will go ahead and add two more roles to ansible:
+In addition to our already existing roles, we will go ahead and add two more roles to Ansible:
 
 
 1.	[SonarQube](https://www.sonarqube.org). (Scroll down to the Sonarqube section to see instructions on how to set up and configure SonarQube manually)
@@ -45,7 +45,7 @@ In addition to our already existing roles, we will go ahead and add two more rol
 
 **Why do we need SonarQube?**
 
-SonarQube is an open-source platform developed by SonarSource for continuous inspection of code quality, it is used to perform automatic reviews with static analysis of code to detect bugs, code smells, and security vulnerabilities. Watch a short description here. There is a lot more hands on work ahead with SonarQube and Jenkins. So, the purpose of SonarQube will be clearer to you very soon.
+SonarQube is an open-source platform developed by SonarSource for continuous inspection of code quality, it is used to perform automatic reviews with static analysis of code to detect bugs, code smells, and security vulnerabilities. Watch a short description here. There is a lot more hands-on work ahead with SonarQube and Jenkins. So, the purpose of SonarQube will be clearer to you very soon.
 
 **Why do we need Artifactory?**
 
@@ -53,7 +53,7 @@ Artifactory is a product by JFrog that serves as a binary repository manager. Th
 
 ### Configuring Ansible for Jenkins Deployment
 
-In previous projects, we have been launching Ansible commands manually from a CLI. Now, with Jenkins, we will start running Ansible from Jenkins user interface (UI).
+In previous projects, we have been launching Ansible commands manually from a CLI. Now, with Jenkins, we will start running Ansible from the Jenkins user interface (UI).
 
 To do this, navigate to Jenkins URL, Install & Open Blue Ocean Jenkins Plugin
 
@@ -224,11 +224,11 @@ When all stages are now created, it should look like below.
 Now that we have a broad overview of a typical Jenkins pipeline. Let us get the actual Ansible deployment to work by:
 -	Installing Ansible on Jenkins
 -	Installing Ansible plugin in Jenkins UI
--	Creating Jenkinsfile from scratch. (Delete all currently in the jenkinsfile and start all over to get Ansible to run successfully). 
+-	Creating Jenkinsfile from scratch. (Delete all currently in the Jenkinsfile and start all over to get Ansible to run successfully). 
 
 Ensure that Ansible runs against the Dev environment successfully.
 
-*Install ansible plugin*
+*Install Ansible plugin*
 
 ![install ansible plugin](Images/Images/ansible-plugin.png)
 
@@ -314,15 +314,15 @@ ssh_args = -o ControlMaster=auto -o ControlPersist=30m -o ControlPath=/tmp/ansib
 
 ![Jenkinsfile](Images/Images/jenkinsfile.png)
 
-3. Remember that ansible.cfg must be exported to environment variable so that Ansible knows where to find Roles. But because you will possibly run Jenkins from different git branches, the location of Ansible roles will change. Therefore, you must handle this dynamically. You can use Linux Stream Editor sed to update the section roles_path each time there is an execution. You may not have this issue if you run only from the main branch.
+3. Remember that ansible.cfg must be exported to the environment variable so that Ansible knows where to find Roles. But because you will possibly run Jenkins from different git branches, the location of Ansible roles will change. Therefore, you must handle this dynamically. You can use Linux Stream Editor sed to update the section roles_path each time there is an execution. You may not have this issue if you run only from the main branch.
 
-1. If you push new changes to Git so that Jenkins failure can be fixed. You might observe that your change may sometimes have no effect. Even though your change is the actual fix required. This can be because Jenkins did not download the latest code from GitHub. Ensure that you start the Jenkinsfile with a clean up step to always delete the previous workspace before running a new one. Sometimes you might need to login to the Jenkins Linux server to verify the files in the workspace to confirm that what you are actually expecting is there. Otherwise, you can spend hours trying to figure out why Jenkins is still failing, when you have pushed up possible changes to fix the error.
+1. If you push new changes to Git so that Jenkins failure can be fixed. You might observe that your change may sometimes have no effect. Even though your change is the actual fix required. This can be because Jenkins did not download the latest code from GitHub. Ensure that you start the Jenkinsfile with a clean-up step to always delete the previous workspace before running a new one. Sometimes you might need to log in to the Jenkins Linux server to verify the files in the workspace to confirm that what you are actually expecting is there. Otherwise, you can spend hours trying to figure out why Jenkins is still failing, when you have pushed up possible changes to fix the error.
 
 1. Another possible reason for Jenkins failure sometimes, is because you have indicated in the Jenkinsfile to check out the main git branch, and you are running a pipeline from another branch. So, always verify by logging onto the Jenkins box to check the workspace, and run *git branch* command to confirm that the branch you are expecting is there.
 
-**Note:** We will note that since we are tring to run the playbook from jenkins, jenkins will need to SSH into the instance. The only way jenkins can “talk to” the instance is by updating the instance credentials (private key) unto jenkins.
+**Note:** We will note that since we are trying to run the playbook from Jenkins, Jenkins will need to SSH into the instance. The only way Jenkins can “talk to” the instance is by updating the instance credentials (private key) unto Jenkins.
 
-To do this, go to jenkins UI and follow the steps below
+To do this, go to Jenkins UI and follow the steps below
 
 ![Add credentials](Images/Images/jenkins-credentials.png)
 
@@ -330,7 +330,7 @@ To do this, go to jenkins UI and follow the steps below
 
 "Add" and "Create" 
 
-To generate our pipeline script (individual ansible playbook command), go back to dashboard, ansible-config-mgt, click on pipeline syntax.
+To generate our pipeline script (individual ansible-playbook command), go back to dashboard, ansible-config-mgt, and click on pipeline syntax.
 
 ![pipeline script generate](Images/Images/pipeline-script-gen.png)
 
@@ -340,11 +340,11 @@ To generate our pipeline script (individual ansible playbook command), go back t
 
 ![pipeline script generate](Images/Images/pipeline-script-gen4.png)
 
-Update pipeline syntax in jenkinsfile.
+Update pipeline syntax in Jenkinsfile.
 
 Now scan the repository.
 
-This will perform an ***initial cleanup, checkout SCM, prepare ansible for execution, run ansible playbook and clean workspace after build***.
+This will perform an ***initial cleanup, checkout SCM, prepare ansible for execution, run ansible-playbook and clean workspace after build***.
 
 ![scan repo](Images/Images/Scan-repo-main.png)
 
@@ -359,7 +359,7 @@ This will perform an ***initial cleanup, checkout SCM, prepare ansible for execu
 
 > Our Dev environment now has an up-to-date configuration. But what if we need to deploy to other environments?
 >
->Manually updating the Jenkinsfile is definitely not an option. The aim is to try to automate things as much as possible.
+>Manually updating the Jenkins file is definitely not an option. The aim is to try to automate things as much as possible.
 
 
 ### Parameterizing Jenkinsfile For Ansible Deployment. 
