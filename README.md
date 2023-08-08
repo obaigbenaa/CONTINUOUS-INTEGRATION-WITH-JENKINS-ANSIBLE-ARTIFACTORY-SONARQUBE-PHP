@@ -49,7 +49,7 @@ SonarQube is an open-source platform developed by SonarSource for continuous ins
 
 **Why do we need Artifactory?**
 
-Artifactory is a product by JFrog that serves as a binary repository manager. The binary repository is a natural extension to the source code repository, in that the outcome of your build process is stored. It can be used for certain other automation, but we will it strictly to manage our build artifacts.
+Artifactory is a product by JFrog that serves as a binary repository manager. The binary repository is a natural extension to the source code repository, in that the outcome of your build process is stored. It can be used for certain other automation, but we will use it strictly to manage our build artifacts.
 
 ### Configuring Ansible for Jenkins Deployment
 
@@ -364,17 +364,134 @@ This will perform an ***initial cleanup, checkout SCM, prepare ansible for execu
 
 ### Parameterizing Jenkinsfile For Ansible Deployment. 
 
-So far we have been deploying to dev environment, what if we need to deploy to other environments? We will use parameterization so that at the point of execution, the appropriate values are applied. To parameterize Jenkinsfile For Ansible Deployment, Update CI inventory with new servers.
+So far we have been deploying to dev environment, what if we need to deploy to other environments? We will use parameterization so that at the point of execution, the appropriate values are applied. 
+To parameterize Jenkinsfile For Ansible deployment, 
+
+1. Update CI inventory with new servers.
+
+```
+[tooling]
+<SIT-Tooling-Web-Server-Private-IP-Address>
+
+[todo]
+<SIT-Todo-Web-Server-Private-IP-Address>
+
+[nginx]
+<SIT-Nginx-Private-IP-Address>
+
+[db:vars]
+ansible_user=ec2-user
+ansible_python_interpreter=/usr/bin/python
+
+[db]
+<SIT-DB-Server-Private-IP-Address>
+```
+
+2. Update Jenkinsfile to introduce parameterization. Below is just one parameter. It has a default value in case if no value is specified at execution. It also has a description so that everyone is aware of its purpose.
+
+```
+pipeline {
+    agent any
+
+    parameters {
+      string(name: 'inventory', defaultValue: 'dev',  description: 'This is the inventory file for the environment to deploy configuration')
+    }
+```
+
+3. In the Ansible execution section, remove the hardcoded inventory/dev and replace with ``` ${inventory} ```
+
+![Parameters](Images/Images/1.Parameters.png)
+
+From now on, each time you hit on execute, it will expect an input. But notice that the default value uploads.
+
+![Alt text](Images/Images/2.build-with-parameters.png)
+
+hit "build" to see confirm it runs.
+
+![Alt text](Images/Images/3.build-dev.yml.png)
 
 
 
+## CI/CD PIPELINE FOR TODO APPLICATION
+
+Here, we will introduce another PHP application to add to the list of software products we are managing in our infrastructure. The good thing with this particular application is that it has unit tests, and it is an ideal application to show an end-to-end CI/CD pipeline for a particular application.
+
+Our goal here is to deploy the PHP application onto servers directly from ```Artifactory``` rather than from ```git```.
+* Update Ansible with an ***Artifactory role***. You can install an Artifcatory role using the ansible galaxy community repository in the roles directory.
+
+![Artifactory-role](Images/Images/6.install-artifactory-role.png)
+
+### Phase 1 – Prepare Jenkins
+
+1. Install git and fork the below code repository into your github account
+
+> https://github.com/darey-devops/php-todo.git
+
+2. On your Jenkins server, install PHP, its dependencies and  [Composer tool](https://getcomposer.org/)
+
+#### *Install php*
+=======
+
+```
+yum -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+
+dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm 
+
+dnf install dnf-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+
+yum install -y php php-common php-mbstring php-opcache php-intl php-xml php-gd php-curl php-mysqlnd php-fpm php-json
+
+systemctl start php-fpm
+
+systemctl enable php-fpm
+
+systemctl status php-fpm
+```
+
+![php-installed](Images/Images/4.php-installed.png)
+
+#### *Install composer*
+===========
+
+```
+curl -sS https://getcomposer.org/installer | php
+
+sudo mv composer.phar /usr/bin/composer
+```
+
+Now, on Jenkins UI, Install the following plugins
+1. Plot plugin - to be used to display tests reports, and code coverage information.
+
+1. Artifactory plugin - to be used to easily upload code artifacts into an Artifactory server.
+
+![Artif_plugin](Images/Images/5.Artifactory_inst.png)
+
+3. Provision a new instance based on RHEL **t2.medium**, to serve as the artifactory server. Set the inbound security rule to listen on port **8081** and **8082**.
+
+Update *inventory/ci.yml* file with private IP address of artifactory 'host'
+
+confirm all tasks and paths on *roles/artifactory/task/main.yml* as well as the *bash-profile.j2*
+
+Update *playbooks/site.yml* to 'import' artifactory.yml
+
+Now run the playbook against the **ci** environment
+
+![ci.yml](Images/Images/7.run-ci.png)
+
+the pipeline should run including the playbook, which will install jfrog artifactory.
+
+![inventory/ci.yml](<Images/Images/8. artifactory-installed.png>)
+
+Add the artifactory server IP address to the JFROG global configuration.
+
+![Alt text](Images/Images/9.artifactory_jenkins-test.png)
+
+![jfrog_login](Images/Images/10.jfrog_login.png)
 
 
+Create a GENERIC Repository called Alex (give it any name you prefer). This will be used to store our build artifacts
 
-
-
-
-
+![generic-repo](Images/Images/11.Jfrog-repo.png)
 
 
 
