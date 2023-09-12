@@ -421,7 +421,8 @@ Our goal here is to deploy the PHP application onto servers directly from ```Art
 
 ![Artifactory-role](Images/Images/6.install-artifactory-role.png)
 
-### Phase 1 – Prepare Jenkins
+## Phase 1 – Prepare Jenkins
+#
 
 1. Install git and fork the below code repository into your github account
 
@@ -429,35 +430,89 @@ Our goal here is to deploy the PHP application onto servers directly from ```Art
 
 2. On your Jenkins server, install PHP, its dependencies and  [Composer tool](https://getcomposer.org/)
 
+### Dependencies to be installed
+=========
+
+- sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+- sudo yum install -y dnf-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+- sudo yum install python3 python3-pip wget unzip git -y
+- python3 -m pip install --upgrade setuptools
+- python3 -m pip install --upgrade pip
+- python3 -m pip install PyMySQL
+- python3 -m pip install mysql-connector-python
+- python3 -m pip install psycopg2==2.7.5 --ignore-installed
+
+#### Install Java
+======
+
+- sudo wget -O /etc/yum.repos.d/jenkins.repo \
+    https://pkg.jenkins.io/redhat-stable/jenkins.repo
+- sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+- sudo yum upgrade
+
+#Add required dependencies for the jenkins package
+- sudo yum install java-17-openjdk
+- sudo yum install jenkins
+- sudo systemctl daemon-reload
+
+#### open the bash profile 
+- sudo vi .bash_profile
+
+#paste the below in the bash profile
+
+export JAVA_HOME=$(dirname $(dirname $(readlink $(readlink $(which javac)))))
+export PATH=$PATH:$JAVA_HOME/bin
+export CLASSPATH=.:$JAVA_HOME/jre/lib:$JAVA_HOME/lib:$JAVA_HOME/lib/tools.jar
+
+#### reload the bash profile
+source ~/.bash_profile
+
+
+
+
 #### *Install php*
 =======
+- sudo yum module reset php -y
+- sudo yum module enable php:remi-7.4 -y
+- sudo yum install -y php  php-common php-mbstring php-opcache php-intl php-xml php-gd php-curl php-mysqlnd    php-fpm php-json
+- sudo systemctl start php-fpm
+- sudo systemctl enable php-fpm
 
+
+![Alt text](Images/Images/4.php-installed.png)
+
+#### Ansible dependencies to install
+=====================================
+
+ #For Mysql Database
 ```
-yum -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
-
-dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm 
-
-dnf install dnf-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
-
-yum install -y php php-common php-mbstring php-opcache php-intl php-xml php-gd php-curl php-mysqlnd php-fpm php-json
-
-systemctl start php-fpm
-
-systemctl enable php-fpm
-
-systemctl status php-fpm
+- ansible-galaxy collection install community.mysql
 ```
 
-![php-installed](Images/Images/4.php-installed.png)
-
-#### *Install composer*
-===========
-
+ #For Postgresql Database
 ```
-curl -sS https://getcomposer.org/installer | php
+ansible-galaxy collection install community.postgresql
+``````
 
-sudo mv composer.phar /usr/bin/composer
-```
+#### Install composer
+=====================================
+- curl -sS https://getcomposer.org/installer | php 
+- sudo mv composer.phar /usr/bin/composer
+
+#### Verify Composer is installed or not
+- composer --version
+
+
+#### Install phpunit, phploc
+=====================================
+- sudo dnf --enablerepo=remi install php-phpunit-phploc
+- wget -O phpunit https://phar.phpunit.de/phpunit-7.phar
+- chmod +x phpunit
+- sudo yum  install php-xdebug
+
+![Alt text](Images/Images/1.php-installed.png)
+
+*above, php is installed with Xdebug*.
 
 Now, on Jenkins UI, Install the following plugins
 1. Plot plugin - to be used to display tests reports, and code coverage information.
@@ -482,7 +537,7 @@ the pipeline should run including the playbook, which will install jfrog artifac
 
 ![inventory/ci.yml](<Images/Images/8. artifactory-installed.png>)
 
-Add the artifactory server IP address to the JFROG global configuration.
+Add the artifactory server IP address to the JFROG global configuration. Configure the server ID, URL and Credentials, run Test Connection.
 
 ![Alt text](Images/Images/9.artifactory_jenkins-test.png)
 
@@ -494,6 +549,124 @@ Create a GENERIC Repository called Alex (give it any name you prefer). This will
 ![generic-repo](Images/Images/11.Jfrog-repo.png)
 
 
+## Phase 2 – Integrate Artifactory repository with Jenkins
+#
 
+1. Create a dummy Jenkinsfile inside the php-todo repository *(derived from phase 1.1 above)*
+
+
+
+1. On the mysql database server, create database and user
+
+```
+Create database homestead;
+CREATE USER 'homestead'@'%' IDENTIFIED BY 'sePret^i';
+GRANT ALL PRIVILEGES ON * . * TO 'homestead'@'%';
+``````
+![Alt text](Images/Images/12.create-db-and-user.png)
+
+git commit, push to branch and update *playbook/site.yml* with db assignmment and build the pipleline again.
+
+confirm that mysql is installed on the host db and database and user created.
+
+```
+sudo mysql
+SHOW DATABASES
+``````
+
+![Alt text](Images/Images/13.msql_installed.png)
+
+3. Using Blue Ocean, create a multibranch Jenkins pipeline
+
+
+
+Install mysql client on the jenkins server: 
+
+```
+sudo yum install mysql -y
+```
+Login into the DB-server(mysql server) and set the the bind address to **0.0.0.0** 
+
+```
+sudo vi /etc/mysql/mysql.conf.d/mysqld.cnf
+```
+![Alt text](Images/Images/14.bindaddress.png)
+
+Note the MySQL ansible role will creat the database for the mysql server
+
+4. In the Php-Todo repo, update the database connectivity requirements in the file *.env.sample*
+
+1. Update Jenkinsfile with proper pipeline configuration and scan phd-todo repository
+
+```
+pipeline {
+    agent any
+
+  stages {
+
+     stage("Initial cleanup") {
+          steps {
+            dir("${WORKSPACE}") {
+              deleteDir()
+            }
+          }
+        }
+
+    stage('Checkout SCM') {
+      steps {
+            git branch: 'main', url: 'https://github.com/darey-devops/php-todo.git'
+      }
+    }
+
+    stage('Prepare Dependencies') {
+      steps {
+             sh 'mv .env.sample .env'
+             sh 'composer install'
+             sh 'php artisan migrate'
+             sh 'php artisan db:seed'
+             sh 'php artisan key:generate'
+      }
+    }
+  }
+}
+```
+
+![Alt text](2.php-todo-pipeline.png)
+
+Notice the Prepare Dependencies section
+
+The required file by PHP is .env so we are renaming .env.sample to .env
+Composer is used by PHP to install all the dependent libraries used by the application
+php artisan uses the .env file to setup the required database objects – (After successful run of this step, login to the database, run show tables and you will see the tables being created for you
+
+![Alt text](1.tables-db.png)
+
+#### Update the Jenkinsfile to include Unit tests step
+
+    stage('Execute Unit Tests') {
+      steps {
+             sh './vendor/bin/phpunit'
+      } 
+
+#### note: *you may encounter an error at this point*
+
+
+Locate your php.ini file: The location of the php.ini file with your favourite text editor
+
+sudo vi /etc/php.ini 
+
+Search for the xdebug.mode setting. If it doesn't exist, you can add it to the [XDebug] section of the file of create it if it does not exist.
+
+*Copy code*
+
+xdebug.mode = coverage
+
+Save the php.ini file and close it.
+
+![Alt text](Images/Images/3.php-execute-stage.png)
+
+
+## Phase 3 – Code Quality Analysis
+#
 
 
