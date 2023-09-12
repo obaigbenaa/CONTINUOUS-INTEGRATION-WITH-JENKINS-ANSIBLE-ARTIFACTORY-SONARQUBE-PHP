@@ -668,5 +668,209 @@ Save the php.ini file and close it.
 
 ## Phase 3 – Code Quality Analysis
 #
+For PHP the most commonly used tool for code quality analysis is [phploc](https://phpqa.io/projects/phploc.html). 
+
+The data produced by phploc can be ploted onto graphs in Jenkins.
+
+1. Add the ***code analysis*** step in Jenkinsfile. 
+The output of the data will be saved in *build/logs/phploc.csv* file
+
+```
+stage('Code Analysis') {
+  steps {
+        sh 'phploc app/ --log-csv build/logs/phploc.csv'
+
+  }
+}
+```
+2. Plot the data set below using the Jenkins **plot** plugin. 
+(This plugin provides generic plotting (or graphing) capabilities in Jenkins. It will plot one or more single values variations across builds in one or more plots.) already installed.  
+
+Now add below stage to php-todo Jenkinsfile.
+
+```
+stage('Plot Code Coverage Report') {
+      steps {
+
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Lines of Code (LOC),Comment Lines of Code (CLOC),Non-Comment Lines of Code (NCLOC),Logical Lines of Code (LLOC)                          ', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'A - Lines of code', yaxis: 'Lines of Code'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Directories,Files,Namespaces', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'B - Structures Containers', yaxis: 'Count'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Average Class Length (LLOC),Average Method Length (LLOC),Average Function Length (LLOC)', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'C - Average Length', yaxis: 'Average Lines of Code'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Cyclomatic Complexity / Lines of Code,Cyclomatic Complexity / Number of Methods ', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'D - Relative Cyclomatic Complexity', yaxis: 'Cyclomatic Complexity by Structure'      
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Classes,Abstract Classes,Concrete Classes', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'E - Types of Classes', yaxis: 'Count'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Methods,Non-Static Methods,Static Methods,Public Methods,Non-Public Methods', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'F - Types of Methods', yaxis: 'Count'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Constants,Global Constants,Class Constants', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'G - Types of Constants', yaxis: 'Count'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Test Classes,Test Methods', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'I - Testing', yaxis: 'Count'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Logical Lines of Code (LLOC),Classes Length (LLOC),Functions Length (LLOC),LLOC outside functions or classes ', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'AB - Code Structure by Logical Lines of Code', yaxis: 'Logical Lines of Code'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Functions,Named Functions,Anonymous Functions', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'H - Types of Functions', yaxis: 'Count'
+            plot csvFileName: 'plot-396c4a6b-b573-41e5-85d8-73613b2ffffb.csv', csvSeries: [[displayTableFlag: false, exclusionValues: 'Interfaces,Traits,Classes,Methods,Functions,Constants', file: 'build/logs/phploc.csv', inclusionFlag: 'INCLUDE_BY_STRING', url: '']], group: 'phploc', numBuilds: '100', style: 'line', title: 'BB - Structure Objects', yaxis: 'Count'
+
+      }
+    }
+```
+
+Push code to Githug and scan repository.
+
+![Alt text](1.code-plot.png)
+
+You should now see a Plot menu item on the left menu. Click on it to see the charts.
+
+![Alt text](Images/Images/2.plot-lines-of-code.png)
+
+3. Bundle the application code for into an artifact (archived package) and upload to Artifactory
+
+sudo yum install zip -y
+
+update Jenkinsfile with code below
+
+```
+stage ('Package Artifact') {
+    steps {
+            sh 'zip -qr php-todo.zip ${WORKSPACE}/*'
+     }
+    }
+```
+
+4. Publish the resulting artifact into Artifactory pipeline
+
+```
+stage ('Upload Artifact to Artifactory') {
+          steps {
+            script { 
+                 def server = Artifactory.server 'Artifactory'                 
+                 def uploadSpec = """{
+                    "files": [
+                      {
+                       "pattern": "php-todo.zip",
+                       "target": "<name-of-artifactory-repository>/php-todo",
+                       "props": "type=zip;status=ready"
+
+                       }
+                    ]
+                 }""" 
+
+                 server.upload spec: uploadSpec
+               }
+            }
+
+        }
+```
 
 
+![Alt text](Images/Images/upload-artifactory.png)
+
+Check Artifactory dashboard, you will see php-todo artifact under the artifacts session.
+
+![Alt text](Images/Images/1.php-todo-artifact.png)
+
+5. Deploy the application to the dev environment by launching Ansible pipeline
+
+Update php-todo jenkinsfile with code below:
+
+```
+stage ('Deploy to Dev Environment') {
+    steps {
+    build job: 'ansible-config-mgt/main', parameters: [[$class: 'StringParameterValue', name: 'env', value: 'dev']], propagate: false, wait: true
+    }
+  }
+```
+The build job used in this step tells Jenkins to start another job. In this case it is the ansible-config-mgt job, and we are targeting the main branch. Hence, we have ansible-config-mgt/main. Since the Ansible project requires parameters to be passed in, we have included this by specifying the parameters section. The name of the parameter is env and its value is dev. Meaning, deploy to the Development environment.
+
+
+create a tooling server and update *inventory/dev.yml* with *todo* server private IP address
+
+Create *deployment.yml* file in the static assignment folder
+
+and input the data below
+
+```
+---
+- name: Deploying the PHP Applicaion to Dev Enviroment
+  become: true
+  hosts: todo
+
+  tasks:
+    - name: install remi and rhel repo
+      ansible.builtin.yum:
+        name:
+          - https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+          - dnf-utils
+          - http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+        disable_gpg_check: yes
+
+    - name: install httpd on the webserver
+      ansible.builtin.yum:
+        name: httpd
+        state: present
+
+    - name: ensure httpd is started and enabled
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: install PHP
+      ansible.builtin.yum:
+        name:
+          - php
+          - php-mysqlnd
+          - php-gd
+          - php-curl
+          - unzip
+          - php-common
+          - php-mbstring
+          - php-opcache
+          - php-intl
+          - php-xml
+          - php-fpm
+          - php-json
+        enablerepo: php:remi-7.4
+        state: present
+
+    - name: ensure php-fpm is started and enabled
+      ansible.builtin.service:
+        name: php-fpm
+        state: started
+        enabled: yes
+
+    - name: Download the artifact
+      get_url:
+        url: <your-artifactory-repo-url>
+        dest: /home/ec2-user/
+        url_username: admin
+        url_password: <encrypted-Password>
+
+    - name: unzip the artifacts
+      ansible.builtin.unarchive:
+        src: /home/ec2-user/php-todo
+        dest: /home/ec2-user/
+        remote_src: yes
+
+    - name: deploy the code
+      ansible.builtin.copy:
+        src: /home/ec2-user/var/lib/jenkins/workspace/php-todo_main/
+        dest: /var/www/html/
+        force: yes
+        remote_src: yes
+
+    - name: remove nginx default page
+      ansible.builtin.file:
+        path: /etc/httpd/conf.d/welcome.conf
+        state: absent
+
+    - name: restart httpd
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+```
+
+see how to generate encrypted password in image below:
+
+![Alt text](Images/Images/encrypt-pass.png)
+
+update playbooks/site/yml to import playbook static-assignments/deployment.yml
+
+scan php-todo repository
+
+you will see that ansible-config-mgt pipeline has been triggered from php-todo
+
+![Alt text](Images/Images/deploy-to-dev.png)
