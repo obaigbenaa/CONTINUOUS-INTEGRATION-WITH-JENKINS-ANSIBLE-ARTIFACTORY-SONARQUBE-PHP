@@ -509,6 +509,18 @@ ansible-galaxy collection install community.postgresql
 - wget -O phpunit https://phar.phpunit.de/phpunit-7.phar
 - chmod +x phpunit
 - sudo yum  install php-xdebug
+- Locate your php.ini file with your favourite text editor
+
+sudo vi /etc/php.ini 
+
+and search for the xdebug.mode setting. If it doesn't exist, you can add it to the [XDebug] section of the file to create it, if it does not exist.
+
+Copy code
+
+**xdebug.mode = coverage**
+
+Save the php.ini file and close it.
+
 
 ![Alt text](Images/Images/1.php-installed.png)
 
@@ -773,7 +785,8 @@ stage ('Deploy to Dev Environment') {
     }
   }
 ```
-The build job used in this step tells Jenkins to start another job. In this case it is the ansible-config-mgt job, and we are targeting the main branch. Hence, we have ansible-config-mgt/main. Since the Ansible project requires parameters to be passed in, we have included this by specifying the parameters section. The name of the parameter is env and its value is dev. Meaning, deploy to the Development environment.
+The build job used in this step tells Jenkins to start another job. In this case it is the ansible-config-mgt job, and we are targeting the main branch. Hence, we have ansible-config-mgt/main. 
+Since the ansible-config-mgt requires parameters to be passed in, we have included this by specifying the parameters section. The name of the parameter is env and its value is dev. Meaning, deploy to the Development environment.
 
 
 create a tooling server and update *inventory/dev.yml* with *todo* server private IP address
@@ -874,3 +887,330 @@ scan php-todo repository
 you will see that ansible-config-mgt pipeline has been triggered from php-todo
 
 ![Alt text](Images/Images/deploy-to-dev.png)
+
+Even though we have implemented Unit Tests and Code Coverage Analysis with phpunit and phploc, we still need to implement Quality Gate to ensure that ONLY code with the required code coverage, and other quality standards make it through to the environments.
+
+To achieve this, we need to configure SonarQube
+
+
+### Install SonarQube on Ubuntu 20.04 LTS
+
+- Tune Linux Kernel
+
+This can be achieved by making session changes which does not persist beyond the current session terminal.
+
+```
+sudo sysctl -w vm.max_map_count=262144
+sudo sysctl -w fs.file-max=65536
+ulimit -n 65536
+ulimit -u 4096
+```
+
+To make a permanent change, edit the file /etc/security/limits.conf and append the below
+
+sonarqube   -   nofile   65536
+sonarqube   -   nproc    4096
+
+Install wget and unzip packages
+
+```
+sudo apt-get install wget unzip -y
+```
+Install OpenJDK and Java Runtime Environment(JRE) 11
+
+```
+sudo apt-get install openjdk-11-jdk -y
+sudo apt-get install openjdk-11-jre -y
+```
+Set default JDK – To set default JDK or switch to OpenJDK enter below command:
+```
+sudo update-alternatives --config java
+```
+Verify the set JAVA Version:
+```
+java -version
+```
+Install and Setup PostgreSQL 10 Database for SonarQube
+
+The command below will add PostgreSQL repo to the repo list:
+```
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" >> /etc/apt/sources.list.d/pgdg.list'
+```
+
+Download PostgreSQL software
+```
+wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | sudo apt-key add -
+```
+
+Install PostgreSQL Database Server
+```
+sudo apt-get -y install postgresql postgresql-contrib
+```
+
+Start PostgreSQL Database Server
+```
+sudo systemctl start postgresql
+```
+
+Change the password for default postgres user (input the password you intend to use, and remember to save it somewhere)
+
+```
+sudo passwd postgres
+```
+
+Switch to the postgres user
+
+```
+su - postgres
+```
+
+Create a new user by typing:
+```
+createuser sonar
+```
+
+Switch to the PostgreSQL shell
+```
+psql
+```
+
+Set a password for the newly created user for SonarQube database
+
+```
+ALTER USER sonar WITH ENCRYPTED password 'sonar';
+```
+Create a new database for PostgreSQL database by running:
+
+```
+CREATE DATABASE sonarqube OWNER sonar;
+```
+Grant all privileges to sonar user on sonarqube Database.
+
+```
+GRANT ALL PRIVILEGES ON DATABASE sonarqube TO sonar;
+```
+Exit from the psql shell:
+```
+\q
+```
+
+Switch back to the sudo user by running the exit command
+
+Exit
+
+#### *Install SonarQube on Ubuntu 20.04 LTS*
+
+Navigate to the tmp directory to temporarily download the installation files
+
+```
+cd /tmp 
+
+sudo wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-7.9.3.zip
+```
+Unzip the archive setup to /opt directory
+
+```
+sudo unzip sonarqube-7.9.3.zip -d /opt
+```
+
+Move extracted setup to /opt/sonarqube directory
+
+```
+sudo mv /opt/sonarqube-7.9.3 /opt/sonarqube
+```
+
+#### CONFIGURE SONARQUBE
+
+We cannot run SonarQube as a root user, if you run using root user it will stop automatically. The ideal approach will be to create a separate group and a user to run SonarQube
+
+Create a group sonar
+```
+sudo groupadd sonar
+```
+Now add a user with control over the /opt/sonarqube directory and change ownership
+
+```
+ sudo useradd -c "user to run SonarQube" -d /opt/sonarqube -g sonar sonar 
+ sudo chown sonar:sonar /opt/sonarqube -R
+```
+
+Open SonarQube configuration file using your favourite text editor (e.g., nano or vim)
+
+sudo vim /opt/sonarqube/conf/sonar.properties
+
+Find the following lines:
+
+#sonar.jdbc.username=
+#sonar.jdbc.password=
+
+Uncomment them and provide the values of PostgreSQL Database username and password you chose:
+```
+#--------------------------------------------------------------------------------------------------
+
+# DATABASE
+
+#
+
+# IMPORTANT:
+
+# - The embedded H2 database is used by default. It is recommended for tests but not for
+
+#   production use. Supported databases are Oracle, PostgreSQL and Microsoft SQLServer.
+
+# - Changes to database connection URL (sonar.jdbc.url) can affect SonarSource licensed products.
+
+# User credentials.
+
+# Permissions to create tables, indices and triggers must be granted to JDBC user.
+
+# The schema must be created first.
+
+sonar.jdbc.username=sonar
+sonar.jdbc.password=sonar
+
+#----- PostgreSQL 9.3 or greater
+# By default the schema named "public" is used. It can be overridden with the parameter "currentSchema".
+
+sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonarqube
+```
+
+
+Edit the sonar script file and set RUN_AS_USER
+
+sudo nano /opt/sonarqube/bin/linux-x86-64/sonar.sh
+
+```
+# If specified, the Wrapper will be run as the specified user.
+
+# IMPORTANT - Make sure that the user has the required privileges to write
+
+#  the PID file and wrapper.log files.  Failure to be able to write the log
+
+#  file will cause the Wrapper to exit without any way to write out an error
+
+#  message.
+
+# NOTE - This will set the user which is used to run the Wrapper as well as
+
+#  the JVM and is not useful in situations where a privileged resource or
+
+#  port needs to be allocated prior to the user being changed.
+
+RUN_AS_USER=sonar
+```
+
+Now, to start SonarQube we need to do following:
+
+Switch to sonar user
+
+sudo su – sonar
+
+cd /opt/sonarqube/bin/linux-x86-64/
+
+Run the script to start SonarQube
+
+./sonar.sh start
+
+Expected output shall be as:
+```
+Starting SonarQube...
+
+Started SonarQube
+```
+Check SonarQube running status:
+
+./sonar.sh status
+
+Sample Output below:
+
+```
+./sonar.sh status
+
+SonarQube is running (9570).
+```
+
+To check SonarQube logs, navigate to */opt/sonarqube/logs/sonar.log* directory
+```
+tail /opt/sonarqube/logs/sonar.log
+```
+Output
+```
+2023.08.24 00:24:21 INFO  app[][o.s.a.SchedulerImpl] Waiting for Elasticsearch to be up and running
+OpenJDK 64-Bit Server VM warning: Option UseConcMarkSweepGC was deprecated in version 9.0 and will likely be removed in a future release.
+2023.08.24 00:24:21 INFO  app[][o.e.p.PluginsService] no modules loaded
+2023.08.24 00:24:21 INFO  app[][o.e.p.PluginsService] loaded plugin [org.elasticsearch.transport.Netty4Plugin]
+2023.08.24 00:24:31 INFO  app[][o.s.a.SchedulerImpl] Process[es] is up
+2023.08.24 00:24:31 INFO  app[][o.s.a.ProcessLauncherImpl] Launch process[[key='web', ipcIndex=2, logFilenamePrefix=web]] from [/opt/sonarqube]: /usr/lib/jvm/java-11-openjdk-amd64/bin/java -Djava.awt.headless=true -Dfile.encoding=UTF-8 -Djava.io.tmpdir=/opt/sonarqube/temp --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED -Xmx512m -Xms128m -XX:+HeapDumpOnOutOfMemoryError -Dhttp.nonProxyHosts=localhost|127.*|[::1] -cp ./lib/common/*:/opt/sonarqube/lib/jdbc/h2/h2-1.3.176.jar org.sonar.server.app.WebServer /opt/sonarqube/temp/sq-process4520644032936249784properties
+2023.08.24 00:25:18 INFO  app[][o.s.a.SchedulerImpl] Process[web] is up
+2023.08.24 00:25:18 INFO  app[][o.s.a.ProcessLauncherImpl] Launch process[[key='ce', ipcIndex=3, logFilenamePrefix=ce]] from [/opt/sonarqube]: /usr/lib/jvm/java-11-openjdk-amd64/bin/java -Djava.awt.headless=true -Dfile.encoding=UTF-8 -Djava.io.tmpdir=/opt/sonarqube/temp --add-opens=java.base/java.util=ALL-UNNAMED -Xmx512m -Xms128m -XX:+HeapDumpOnOutOfMemoryError -Dhttp.nonProxyHosts=localhost|127.*|[::1] -cp ./lib/common/*:/opt/sonarqube/lib/jdbc/h2/h2-1.3.176.jar org.sonar.ce.app.CeServer /opt/sonarqube/temp/sq-process17236995486640882659properties
+2023.08.24 00:25:23 INFO  app[][o.s.a.SchedulerImpl] Process[ce] is up
+2023.08.24 00:25:23 INFO  app[][o.s.a.SchedulerImpl] SonarQube is up
+```
+
+
+You can see that SonarQube is up and running.
+
+#### Configure SonarQube to run as a systemd service
+
+Stop the currently running SonarQube service
+
+```
+cd /opt/sonarqube/bin/linux-x86-64/
+```
+Run the script to stop SonarQube
+
+```
+sudo ./sonar.sh stop
+```
+
+```
+Gracefully stopping SonarQube...
+Stopped SonarQube.
+```
+
+#### *Create a systemd service file for SonarQube to run as System Startup.*
+
+```
+sudo nano /etc/systemd/system/sonar.service
+```
+
+Add the configuration below for systemd to determine how to start, stop, check status, or restart the SonarQube service.
+
+```
+[Unit]
+Description=SonarQube service
+After=syslog.target network.target
+
+[Service]
+Type=forking
+
+ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
+ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
+
+User=sonar
+Group=sonar
+Restart=always
+
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Save the file and control the service with systemctl
+
+```
+sudo systemctl start sonar
+sudo systemctl enable sonar
+sudo systemctl status sonar
+```
+
+Access SonarQube
+
+To access SonarQube using browser, type server’s IP address followed by port 9000
+
+http://server_IP:9000 OR http://localhost:9000
+
+![Alt text](Images/Images/Sonar-start.png)
+ 
