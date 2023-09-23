@@ -915,16 +915,22 @@ Install wget and unzip packages
 
 ```
 sudo apt-get install wget unzip -y
+
+sudo apt update
+
 ```
 Install OpenJDK and Java Runtime Environment(JRE) 11
 
 ```
 sudo apt-get install openjdk-11-jdk -y
 sudo apt-get install openjdk-11-jre -y
+
 ```
 Set default JDK – To set default JDK or switch to OpenJDK enter below command:
+
 ```
 sudo update-alternatives --config java
+
 ```
 Verify the set JAVA Version:
 ```
@@ -941,6 +947,7 @@ Download PostgreSQL software
 ```
 wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | sudo apt-key add -
 ```
+you shoulld get a response "OK"
 
 Install PostgreSQL Database Server
 ```
@@ -948,8 +955,10 @@ sudo apt-get -y install postgresql postgresql-contrib
 ```
 
 Start PostgreSQL Database Server
+
 ```
 sudo systemctl start postgresql
+sudo systemctl status postgresql
 ```
 
 Change the password for default postgres user (input the password you intend to use, and remember to save it somewhere)
@@ -970,6 +979,7 @@ createuser sonar
 ```
 
 Switch to the PostgreSQL shell
+
 ```
 psql
 ```
@@ -1077,7 +1087,7 @@ sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonarqube
 
 Edit the sonar script file and set RUN_AS_USER
 
-sudo nano /opt/sonarqube/bin/linux-x86-64/sonar.sh
+sudo vi /opt/sonarqube/bin/linux-x86-64/sonar.sh
 
 ```
 # If specified, the Wrapper will be run as the specified user.
@@ -1171,7 +1181,7 @@ Stopped SonarQube.
 #### *Create a systemd service file for SonarQube to run as System Startup.*
 
 ```
-sudo nano /etc/systemd/system/sonar.service
+sudo vi /etc/systemd/system/sonar.service
 ```
 
 Add the configuration below for systemd to determine how to start, stop, check status, or restart the SonarQube service.
@@ -1213,4 +1223,45 @@ To access SonarQube using browser, type server’s IP address followed by port 9
 http://server_IP:9000 OR http://localhost:9000
 
 ![Alt text](Images/Images/Sonar-start.png)
+
+### CONFIGURE SONARQUBE AND JENKINS FOR QUALITY GATE
  
+In Jenkins, install SonarQube Scanner plugin
+
+Navigate to configure system in Jenkins. Add SonarQube server as shown below:
+
+ - Manage Jenkins > Configure System
+
+ ![Alt text](Images/Images/1.sonar-jenkins.png)
+
+ Generate authentication token in SonarQube
+
+ ![Alt text](Images/Images/sonar-token.png)
+
+ Configure Quality Gate Jenkins Webhook in SonarQube – The URL should point to your Jenkins server *http://{jenkins-IP:8080}/sonarqube-webhook/*
+
+ ![Alt text](Images/Images/1.webhook.png)
+
+ Setup SonarQube scanner from Jenkins – Global Tool Configuration
+
+ ![Alt text](Images/Images/sonarqubescanner.png)
+
+#### Update Jenkins Pipeline to include SonarQube scanning and Quality Gate
+
+Below is the snippet for a Quality Gate stage in Jenkinsfile of the Todo repository.
+
+it may be advisible to input the code snipet before the "Package Artifact" stage
+
+```
+stage('SonarQube Quality Gate') {
+        environment {
+            scannerHome = tool 'SonarQubeScanner'
+        }
+        steps {
+            withSonarQubeEnv('sonarqube') {
+                sh "${scannerHome}/bin/sonar-scanner"
+            }
+
+        }
+    }
+```
