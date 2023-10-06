@@ -1367,6 +1367,9 @@ To introduce Jenkins slaves and configure Jenkins to run pipeline jobs randomly 
 
 ```
 sudo yum install java-11-openjdk-devel -y
+
+javac -version
+
 ```
 * Update bash profile
 
