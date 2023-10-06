@@ -458,7 +458,7 @@ Our goal here is to deploy the PHP application onto servers directly from ```Art
 #### open the bash profile 
 - sudo vi .bash_profile
 
-#paste the below in the bash profile
+#### paste the below in the bash profile
 
 export JAVA_HOME=$(dirname $(dirname $(readlink $(readlink $(which javac)))))
 export PATH=$PATH:$JAVA_HOME/bin
@@ -893,17 +893,17 @@ Even though we have implemented Unit Tests and Code Coverage Analysis with phpun
 To achieve this, we need to configure SonarQube
 
 
-### Install SonarQube on Ubuntu 20.04 LTS
+### Install SonarQube on Ubuntu 22.04 LTS
 
 - Tune Linux Kernel
 
 This can be achieved by making session changes which does not persist beyond the current session terminal.
 
 ```
-sudo sysctl -w vm.max_map_count=262144
-sudo sysctl -w fs.file-max=65536
-ulimit -n 65536
-ulimit -u 4096
+sudo sysctl -w vm.max_map_count=524288
+sudo sysctl -w fs.file-max=131072
+ulimit -n 131072
+ulimit -u 8192
 ```
 
 To make a permanent change, edit the file /etc/security/limits.conf and append the below
@@ -1008,7 +1008,7 @@ Switch back to the sudo user by running the exit command
 
 Exit
 
-#### *Install SonarQube on Ubuntu 20.04 LTS*
+#### *Install SonarQube on Ubuntu 22.04 LTS*
 
 Navigate to the tmp directory to temporarily download the installation files
 
@@ -1255,7 +1255,7 @@ it may be advisible to input the code snipet before the "Package Artifact" stage
 ```
 stage('SonarQube Quality Gate') {
         environment {
-            scannerHome = tool 'SonarQubeScanner'
+            scannerHome = tool 'sonarqubescanner'
         }
         steps {
             withSonarQubeEnv('sonarqube') {
@@ -1265,3 +1265,134 @@ stage('SonarQube Quality Gate') {
         }
     }
 ```
+
+#### *Update sonar-scanner.properties*
+
+cd /var/lib/jenkins/tools/hudson.plugins.sonar.SonarRunnerInstallation/sonarqubescanner/conf/
+
+Open *sonar-scanner.properties* file
+
+```
+sudo vi sonar-scanner.properties
+```
+Add configuration related to *php-todo* project
+
+sonar.host.url=http://<SonarQube-Server-IP-address>:9000
+sonar.projectKey=php-todo
+#----- Default source code encoding
+sonar.sourceEncoding=UTF-8
+sonar.php.exclusions=**/vendor/**
+sonar.php.coverage.reportPaths=build/logs/clover.xml
+sonar.php.tests.reportPath=build/logs/junit.xml
+sonar.login=<your_user_token>
+
+![Alt text](Images/Images/sonar.properties.png)
+
+update the github repo and run the pipeline.
+
+
+### End-to-End Pipeline Overview
+
+If everything has worked out for you so far, you should have a view like below:
+
+![Alt text](Images/Images/end-to-end-pipleine.png)
+
+The quality gate we just included has no effect because if you go to the SonarQube UI, you will realise that we just pushed a poor-quality code onto the development environment.
+
+Navigate to php-todo project in SonarQube
+
+![Alt text](Images/Images/Sonarqube-quality-gate.png)
+
+There are bugs, and there is 13.7% code coverage. (code coverage is a percentage of unit tests added by developers to test functions and objects in the code)
+
+If you click on php-todo project for further analysis, you will see that there is 20 days’ worth of technical debt, aprox. 2000 code smells and security issues in the code.
+
+![Alt text](Images/Images/technical-depth.png)
+
+A measure of "20 days' worth of technical debt" reported by SonarQube indicates a substantial amount of accumulated issues and code quality problems in your software project. This metric suggests that it would take approximately 20 days of developer effort to address the identified technical debt and bring the codebase to a higher level of quality.
+
+ While it may seem daunting, it's crucial to address technical debt systematically and continuously. By doing so, you can enhance the maintainability, reliability, and overall quality of your software over time.
+
+ Assuming a basic gitflow implementation restricts only the develop branch to deploy code to Integration environment like sit.
+
+Let us update our Jenkinsfile to implement this:
+
+* First, we will include a When condition to run Quality Gate whenever the running branch is either develop, hotfix, release, main, or master
+
+```
+when { branch pattern: "^develop*|^hotfix*|^release*|^main*", comparator: "REGEXP"}
+```
+* Then we add a timeout step to wait for SonarQube to complete analysis and successfully finish the pipeline only when code quality is acceptable.
+
+```
+timeout(time: 1, unit: 'MINUTES') {
+        waitForQualityGate abortPipeline: true
+    }
+```
+The complete "SonarQube Quality Gate" stage will now look like this:
+
+```
+stage('SonarQube Quality Gate') {
+      when { branch pattern: "^develop*|^hotfix*|^release*|^main*", comparator: "REGEXP"}
+        environment {
+            scannerHome = tool 'SonarQubeScanner'
+        }
+        steps {
+            withSonarQubeEnv('sonarqube') {
+                sh "${scannerHome}/bin/sonar-scanner -Dproject.settings=sonar-project.properties"
+            }
+            timeout(time: 1, unit: 'MINUTES') {
+                waitForQualityGate abortPipeline: true
+            }
+        }
+    }
+
+```
+
+To test, we create different branches and push to GitHub. You will realise that only branches other than develop, hotfix, release, main, or master will be able to deploy the code.
+
+![Alt text](Images/Images/hotfix-branch.png)
+
+![Alt text](Images/Images/sonar-quality-gate.png)
+
+Notice that with the current state of the code, it cannot be deployed to Integration environments due to its quality. In the real world, DevOps engineers will push this back to developers to work on the code further, based on SonarQube quality report. Once everything is good with code quality, the pipeline will pass and proceed with sipping the codes further to a higher environment
+
+## Configure Jenkins Slave
+
+To introduce Jenkins slaves and configure Jenkins to run pipeline jobs randomly on any available slave nodes, as well as set up a webhook between Jenkins and GitHub to automatically trigger the pipeline on code push, and deploy the application to multiple environments, follow these steps:
+
+* Provision an additional RHEL server (t2-micro will do) that will serve as Jenkins slave. 
+
+* Install Java
+
+```
+sudo yum install java-11-openjdk-devel -y
+```
+* Update bash profile
+
+```
+sudo vi .bash_profile with the file below
+```
+
+```
+export JAVA_HOME=$(dirname $(dirname $(readlink $(readlink $(which java)))))
+export PATH=$PATH:$JAVA_HOME/bin 
+export CLASSPATH=.:$JAVA_HOME/jre/lib:$JAVA_HOME/lib:$JAVA_HOME/lib/tools.jar
+```
+Reload the bash profile
+
+```
+source ~/.bash_profile
+```
+
+* Create and configure jenkins-slave node
+
+![Alt text](Images/Images/add-node1.png)
+
+![Alt text](Images/Images/node-add-configure.png)
+
+![Alt text](Images/Images/node-add-configure1.png)
+
+![Alt text](Images/Images/created-slave.png)
+
+
