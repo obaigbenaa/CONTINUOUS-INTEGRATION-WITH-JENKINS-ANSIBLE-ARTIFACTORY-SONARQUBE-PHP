@@ -23,7 +23,7 @@ We will be making use of AWS virtual machines for this and will require 6 server
 
 **Nginx Server:** This would act as the reverse proxy server to our site and tool.
 
-**Jenkins server:** To be used to implement your CI/CD workflows or pipelines. Select a t2.medium at least, Ubuntu 20.04 and Security group should be open to port 8080
+**Jenkins server:** To be used to implement your CI/CD workflows or pipelines. Select a t2.medium at least, Ubuntu 20.04 and Security group should be open to port 8080 - **RHEL 8.2 and above**.
 
 **SonarQube server:** To be used for Code quality analysis. Select a t2.medium at least, Ubuntu 20.04 and Security group should be open to port 9000
 
@@ -451,7 +451,7 @@ Our goal here is to deploy the PHP application onto servers directly from ```Art
 - sudo yum upgrade
 
 #Add required dependencies for the jenkins package
-- sudo yum install java-17-openjdk
+- sudo yum install java-11-openjdk
 - sudo yum install jenkins
 - sudo systemctl daemon-reload
 
